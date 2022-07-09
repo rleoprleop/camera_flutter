@@ -1,9 +1,17 @@
 import 'dart:async';
 import 'package:camera/camera.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'dart:math' as math;
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image/image.dart' as img;
+import 'package:path/path.dart' show join;
+import 'package:path_provider/path_provider.dart';
 
 class TakePictureScreen extends StatefulWidget {
   const TakePictureScreen({
@@ -17,12 +25,12 @@ class TakePictureScreen extends StatefulWidget {
   TakePictureScreenState createState() => TakePictureScreenState();
 }
 
-String adurl='https://naver.com';
-String adimage='assets/eye.png';
 class TakePictureScreenState extends State<TakePictureScreen> {
-  Uri _url=Uri.parse(adurl);
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
+  late String adurl;
+  late String adimage;
+  late String imagepath;
 
   @override
   void initState() {
@@ -40,7 +48,27 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     _initializeControllerFuture = _controller.initialize();
   }
 
-  void _launchUrl() async {
+  @override
+  void dispose() {
+    // Dispose of the controller when the widget is disposed.
+    _controller.dispose();
+    overlayEntry.dispose();
+    super.dispose();
+  }
+
+  late final OverlayEntry overlayEntry =
+      OverlayEntry(builder: (context) => overlay(context));
+
+  void insertOverlay() {
+    // 적절한 타이밍에 호출
+    if (!overlayEntry.mounted) {
+      OverlayState overlayState = Overlay.of(context)!;
+      overlayState.insert(overlayEntry);
+    }
+  }
+
+  void _launchUrl(String adurl) async {
+    Uri _url = Uri.parse(adurl);
     if (await (canLaunchUrl(_url))) {
       await launchUrl(_url, webOnlyWindowName: "_blank");
     } else {
@@ -48,68 +76,60 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     }
   }
 
-  void _showOverlay(BuildContext context) async {
-    // Declaring and Initializing OverlayState
-    // and OverlayEntry objects
-    OverlayState? overlayState = Overlay.of(context);
-    OverlayEntry? overlayEntry;
-    overlayEntry = OverlayEntry(builder: (context) {
-      return Positioned(
+  Widget overlay(BuildContext context) {
+    return Positioned(
         height: MediaQuery.of(context).size.width * 0.75,
         width: MediaQuery.of(context).size.width,
         bottom: 0,
         child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(50),
-            color: Colors.white,
-          ),
-          child: Stack(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  _launchUrl();
-                },
-                child: Image.asset(
-                  adimage,
-                ),
-              ),
-              Positioned(
-                right: 20,
-                top: 20,
-                child: GestureDetector(
-                  onTap: () {
-                    // When the icon is pressed the OverlayEntry
-                    // is removed from Overlay
-                    overlayEntry?.remove();
-                  },
-                  child: Container(
-                    height: 30.0,
-                    width: 30.0,
-                    padding: const EdgeInsets.all(1.0),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 1.0),
-                      color: Colors.white,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+            ),
+            child: Stack(
+              children: [
+                Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      _launchUrl(adurl);
+                    },
+                    child: Image.network(
+                      adimage,
                     ),
-                    child: Icon(Icons.close,
-                        color: Colors.black,
-                        size: MediaQuery.of(context).size.height * 0.025),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      );
-    });
-    overlayState?.insert(overlayEntry);
+                Positioned(
+                  right: 20,
+                  top: 20,
+                  child: GestureDetector(
+                    onTap: () {
+                      // When the icon is pressed the OverlayEntry
+                      // is removed from Overlay
+                      removeOverlay();
+                    },
+                    child: Container(
+                      height: 30.0,
+                      width: 30.0,
+                      padding: const EdgeInsets.all(1.0),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.black, width: 1.0),
+                        color: Colors.white,
+                      ),
+                      child: Icon(Icons.close,
+                          color: Colors.black,
+                          size: MediaQuery.of(context).size.height * 0.025),
+                    ),
+                  ),
+                ),
+              ],
+            )));
   }
 
-  @override
-  void dispose() {
-    // Dispose of the controller when the widget is disposed.
-    _controller.dispose();
-    super.dispose();
+  void removeOverlay() {
+    // 적절한 타이밍에 호출
+    if (overlayEntry.mounted) {
+      overlayEntry.remove();
+    }
   }
 
   @override
@@ -138,11 +158,23 @@ class TakePictureScreenState extends State<TakePictureScreen> {
           try {
             // Ensure that the camera is initialized.
             await _initializeControllerFuture;
-
             // Attempt to take a picture and get the file `image`
             // where it was saved.
+            final path = join(
+              // 본 예제에서는 임시 디렉토리에 이미지를 저장합니다. `path_provider`
+              // 플러그인을 사용하여 임시 디렉토리를 찾으세요.
+              (await getApplicationDocumentsDirectory()).path,
+            );
             final image = await _controller.takePicture();
 
+            print(path + " " + image.path);/*
+            await rotateImage(image.path).then((value) {
+              imagepath = value;
+            }).catchError((onError) {
+              print("rotate error");
+            }); //이미지 정상으로.*/
+
+            print(image.path);
             // If the picture was taken, display it on a new screen.
             await Navigator.of(context).push(
               MaterialPageRoute(
@@ -153,14 +185,38 @@ class TakePictureScreenState extends State<TakePictureScreen> {
                 ),
               ),
             );
-            _showOverlay(context);
+            await fetchAlbum(image.path).then((value) {
+              //adurl = value.ad_url;
+              //adimage = value.banner_url;
+              adurl='https://pages.coupang.com/p/64094?from=home_C2&traid=home_C2&trcid=11165648';
+              adimage='https://static.coupangcdn.com/ta/cmg_paperboy/image/1657068306263/C2-1-%ED%97%AC%EC%8A%A4%ED%95%98%EC%9A%B0%EC%8A%A4.jpg';
+              insertOverlay();
+            });
           } catch (e) {
             // If an error occurs, log the error to the console.
             print(e);
           }
         },
-        child: const Icon(Icons.camera_alt),
+        child: Container(
+          height: 80.0,
+          width: 80.0,
+          padding: const EdgeInsets.all(1.0),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border:
+            Border.all(color: Colors.black, width: 1.0),
+            color: Colors.white,
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border:
+              Border.all(color: Colors.black, width: 3.0),
+            ),
+          ),
+        ),
       ),
+      floatingActionButtonLocation: (FloatingActionButtonLocation.centerFloat),
     );
   }
 }
@@ -175,17 +231,80 @@ class DisplayPictureScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Display the Picture')),
-      // The image is stored as a file on the device. Use the `Image.file`
-      // constructor with the given path to display the image.
-      body: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.rotationY(math.pi),
-        child: Image.file(File(imagePath),
-        ),
-      ),
+        appBar: AppBar(),
+        // The image is stored as a file on the device. Use the `Image.file`
+        // constructor with the given path to display the image.
+        body: Image.file(
+          File(imagePath),
+        ));
+  }
+}
+
+Future<Ad> fetchAlbum(String imagepath) async {
+  Dio dio = new Dio();
+  var formData =
+      FormData.fromMap({'image': await MultipartFile.fromFile(imagepath)});
+  final response = await dio.post(
+    'http://3.35.147.134/api/predict',
+    data: formData,
+  );
+
+  print(response.data);
+  if (response.statusCode == 200) {
+    // If the server did return a 200 OK response,
+    // then parse the JSON.
+    final a = Ad.fromJson(response.data);
+    print(a.banner_url);
+    return a;
+  } else {
+    // If the server did not return a 200 OK response,
+    // then throw an exception.
+    throw Exception('Failed to load album');
+  }
+}
+
+class Ad {
+  final int age;
+  final String name;
+  final String banner_url;
+  final String ad_url;
+
+  const Ad({
+    required this.age,
+    required this.name,
+    required this.banner_url,
+    required this.ad_url,
+  });
+
+  factory Ad.fromJson(Map<String, dynamic> json) {
+    return Ad(
+      age: json['age'],
+      name: json['name'],
+      banner_url: json['banner_url'],
+      ad_url: json['ad_url'],
     );
   }
+}
+
+Future<String> rotateImage(String path) async {
+  final originalFile = File(path);
+  List<int> imageBytes = await originalFile.readAsBytes();
+  final originalImage = img.decodeImage(imageBytes);
+
+  img.Image fixedImage;
+  fixedImage = img.flipHorizontal(originalImage!);
+
+  final fixedFile = await originalFile.writeAsBytes(img.encodeJpg(fixedImage));
+  return fixedFile.path;
+}
+
+Future<String> cropImage(String imagepath) async {
+  print(imagepath);
+  final croppedImage = await ImageCropper().cropImage(
+    sourcePath: imagepath,
+    compressQuality: 50,
+  );
+  return croppedImage!.path;
 }
 
 /*final Uri _url = Uri.parse('https://naver.com');
