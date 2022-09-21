@@ -1,65 +1,592 @@
 import 'dart:async';
-import 'package:camera/camera.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'dart:developer';
 import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'dart:math' as math;
-import 'package:image_cropper/image_cropper.dart';
-import 'package:image/image.dart' as img;
-import 'package:path/path.dart' show join;
+
+import 'package:camera/camera.dart';
+import 'package:example/preview_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:gallery_saver/gallery_saver.dart';
+import 'package:image/image.dart' as img;
+import 'package:flutter_native_image/flutter_native_image.dart';
+import 'package:dio/dio.dart';
 
-class TakePictureScreen extends StatefulWidget {
-  const TakePictureScreen({
-    Key? key,
-    required this.camera,
-  }) : super(key: key);
+import '../main.dart';
 
-  final CameraDescription camera;
-
+class CameraScreen extends StatefulWidget {
   @override
-  TakePictureScreenState createState() => TakePictureScreenState();
+  _CameraScreenState createState() => _CameraScreenState();
 }
 
-class TakePictureScreenState extends State<TakePictureScreen> {
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
-  late String adurl;
-  late String adimage;
-  late String imagepath;
+class _CameraScreenState extends State<CameraScreen>
+    with WidgetsBindingObserver {
+  CameraController? controller;
+
+  File? _imageFile;
+
+  // Initial values
+  bool _isCameraInitialized = false;
+  bool _isCameraPermissionGranted = false;
+  bool _isRearCameraSelected = true;
+  double _minAvailableExposureOffset = 0.0;
+  double _maxAvailableExposureOffset = 0.0;
+  double _minAvailableZoom = 1.0;
+  double _maxAvailableZoom = 1.0;
+
+  //
+  late String _adurl;
+  late String _adimage;
+  late String _imagepath;
+  late Size size;
+
+  final bool _canProcess = true;
+  late bool _isBusy = false;
+
+  final FaceDetector _faceDetector = FaceDetector(
+    options: FaceDetectorOptions(
+      enableContours: true,
+      enableTracking: true,
+    ),
+  );
+  // Current values
+  double _currentZoomLevel = 1.0;
+  double _currentExposureOffset = 0.0;
+
+  List<File> allFileList = [];
+
+  final resolutionPresets = ResolutionPreset.values;
+
+  ResolutionPreset currentResolutionPreset = ResolutionPreset.high;
+
+  getPermissionStatus() async {
+    await Permission.camera.request();
+    var status = await Permission.camera.status;
+
+    if (status.isGranted) {
+      log('Camera Permission: GRANTED');
+      setState(() {
+        _isCameraPermissionGranted = true;
+      });
+      // Set and initialize the new camera
+      onNewCameraSelected(cameras[0]);
+      refreshAlreadyCapturedImages();
+    } else {
+      log('Camera Permission: DENIED');
+    }
+  }
+
+  refreshAlreadyCapturedImages() async {
+    final directory = await getApplicationDocumentsDirectory();
+    List<FileSystemEntity> fileList = await directory.list().toList();
+    allFileList.clear();
+    List<Map<int, dynamic>> fileNames = [];
+
+    fileList.forEach((file) {
+      if (file.path.contains('.jpg')) {
+        allFileList.add(File(file.path));
+
+        String name = file.path.split('/').last.split('.').first;
+        fileNames.add({0: int.parse(name), 1: file.path.split('/').last});
+      }
+    });
+
+    if (fileNames.isNotEmpty) {
+      final recentFile =
+      fileNames.reduce((curr, next) => curr[0] > next[0] ? curr : next);
+      String recentFileName = recentFile[1];
+
+      _imageFile = File('${directory.path}/$recentFileName');
+
+
+      setState(() {});
+    }
+  }
+
+  Future<XFile?> takePicture() async {
+    final CameraController? cameraController = controller;
+
+    if (cameraController!.value.isTakingPicture) {
+      // A capture is already pending, do nothing.
+      return null;
+    }
+
+    try {
+      XFile file = await cameraController.takePicture();
+      return file;
+    } on CameraException catch (e) {
+      print('Error occured while taking picture: $e');
+      return null;
+    }
+  }
+
+  void resetCameraValues() async {
+    _currentZoomLevel = 1.0;
+    _currentExposureOffset = 0.0;
+  }
+
+  void onNewCameraSelected(CameraDescription cameraDescription) async {
+    final previousCameraController = controller;
+
+    final CameraController cameraController = CameraController(
+      cameraDescription,
+      currentResolutionPreset,
+      imageFormatGroup: ImageFormatGroup.jpeg,
+    );
+
+    await previousCameraController?.dispose();
+
+    resetCameraValues();
+
+    if (mounted) {
+      setState(() {
+        controller = cameraController;
+        controller?.setFlashMode(FlashMode.off);
+      });
+    }
+
+    // Update UI if controller updated
+    cameraController.addListener(() {
+      if (mounted) setState(() {});
+    });
+
+    try {
+      await cameraController.initialize();
+      await Future.wait([
+        cameraController
+            .getMinExposureOffset()
+            .then((value) => _minAvailableExposureOffset = value),
+        cameraController
+            .getMaxExposureOffset()
+            .then((value) => _maxAvailableExposureOffset = value),
+        cameraController
+            .getMaxZoomLevel()
+            .then((value) => _maxAvailableZoom = value),
+        cameraController
+            .getMinZoomLevel()
+            .then((value) => _minAvailableZoom = value),
+      ]);
+    } on CameraException catch (e) {
+      print('Error initializing camera: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = controller!.value.isInitialized;
+      });
+    }
+  }
+
+  void onViewFinderTap(TapDownDetails details, BoxConstraints constraints) {
+    if (controller == null) {
+      return;
+    }
+
+    final offset = Offset(
+      details.localPosition.dx / constraints.maxWidth,
+      details.localPosition.dy / constraints.maxHeight,
+    );
+    controller!.setExposurePoint(offset);
+    controller!.setFocusPoint(offset);
+  }
 
   @override
   void initState() {
+    // Hide the status bar in Android
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+    getPermissionStatus();
     super.initState();
-    // To display the current output from the Camera,
-    // create a CameraController.
-    _controller = CameraController(
-      // Get a specific camera from the list of available cameras.
-      widget.camera,
-      // Define the resolution to use.
-      ResolutionPreset.medium,
-    );
+  }
 
-    // Next, initialize the controller. This returns a Future.
-    _initializeControllerFuture = _controller.initialize();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final CameraController? cameraController = controller;
+
+    // App state changed before we got the chance to initialize.
+    if (cameraController == null || !cameraController.value.isInitialized) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive) {
+      cameraController.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      onNewCameraSelected(cameraController.description);
+    }
   }
 
   @override
   void dispose() {
-    // Dispose of the controller when the widget is disposed.
-    _controller.dispose();
+    controller?.dispose();
     overlayEntry.dispose();
+    _faceDetector.close();
     super.dispose();
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: _isCameraPermissionGranted
+            ? _isCameraInitialized
+            ? Column(
+          children: [
+            AspectRatio(
+              aspectRatio: 1 / controller!.value.aspectRatio,
+              child: Stack(
+                children: [
+                  CameraPreview(
+                    controller!,
+                    child: LayoutBuilder(builder:
+                        (BuildContext context,
+                        BoxConstraints constraints) {
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapDown: (details) =>
+                            onViewFinderTap(details, constraints),
+                      );
+                    }),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      16.0,
+                      8.0,
+                      16.0,
+                      8.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black87,
+                              borderRadius:
+                              BorderRadius.circular(10.0),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.only(
+                                left: 8.0,
+                                right: 8.0,
+                              ),
+                              child: DropdownButton<ResolutionPreset>(
+                                dropdownColor: Colors.black87,
+                                underline: Container(),
+                                value: currentResolutionPreset,
+                                items: [
+                                  for (ResolutionPreset preset
+                                  in resolutionPresets)
+                                    DropdownMenuItem(
+                                      child: Text(
+                                        preset
+                                            .toString()
+                                            .split('.')[1]
+                                            .toUpperCase(),
+                                        style: TextStyle(
+                                            color: Colors.white),
+                                      ),
+                                      value: preset,
+                                    )
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    currentResolutionPreset = value!;
+                                    _isCameraInitialized = false;
+                                  });
+                                  onNewCameraSelected(
+                                      controller!.description);
+                                },
+                                hint: Text("Select item"),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Spacer(),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                              right: 8.0, top: 16.0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius:
+                              BorderRadius.circular(10.0),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                _currentExposureOffset
+                                    .toStringAsFixed(1) +
+                                    'x',
+                                style: TextStyle(color: Colors.black),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: RotatedBox(
+                            quarterTurns: 3,
+                            child: Container(
+                              height: 30,
+                              child: Slider(
+                                value: _currentExposureOffset,
+                                min: _minAvailableExposureOffset,
+                                max: _maxAvailableExposureOffset,
+                                activeColor: Colors.white,
+                                inactiveColor: Colors.white30,
+                                onChanged: (value) async {
+                                  setState(() {
+                                    _currentExposureOffset = value;
+                                  });
+                                  await controller!
+                                      .setExposureOffset(value);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Slider(
+                                value: _currentZoomLevel,
+                                min: _minAvailableZoom,
+                                max: _maxAvailableZoom,
+                                activeColor: Colors.white,
+                                inactiveColor: Colors.white30,
+                                onChanged: (value) async {
+                                  setState(() {
+                                    _currentZoomLevel = value;
+                                  });
+                                  await controller!
+                                      .setZoomLevel(value);
+                                },
+                              ),
+                            ),
+                            Padding(
+                              padding:
+                              const EdgeInsets.only(right: 8.0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black87,
+                                  borderRadius:
+                                  BorderRadius.circular(10.0),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    _currentZoomLevel
+                                        .toStringAsFixed(1) +
+                                        'x',
+                                    style: TextStyle(
+                                        color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Row(
+
+                mainAxisAlignment:
+                MainAxisAlignment.spaceBetween,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isCameraInitialized = false;
+                      });
+                      onNewCameraSelected(cameras[
+                      _isRearCameraSelected
+                          ? 1
+                          : 0]);
+                      setState(() {
+                        _isRearCameraSelected =
+                        !_isRearCameraSelected;
+                      });
+                    },
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          color: Color(0xffB4C5D5),
+                          size: 60,
+                        ),
+                        Icon(
+                          _isRearCameraSelected
+                              ? Icons.camera_front
+                              : Icons.camera_rear,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      XFile? rawImage =
+                      await takePicture();
+                      File imageFile =
+                      File(rawImage!.path);
+
+                      //
+                      print(_isRearCameraSelected);
+                      if (_isRearCameraSelected == 0) {
+                        _saveImage(rawImage.path);
+                        //이미지 정상으로.
+                        await rotateImage(rawImage.path).then((value) {
+                          _imagepath = value;
+                        }).catchError((onError) {
+                          print("rotate error");
+                        });
+                      } else {
+                        await rotateImage(rawImage.path).then((value) {
+                          _imagepath = value;
+                        }).catchError((onError) {
+                          print("rotate error");
+                        });
+                        _saveImage(rawImage.path);
+                        //이미지 정상으로.
+                      }
+
+                      print(_imagepath);
+                      print("resolution ${controller?.resolutionPreset.index}");
+                      await processImage(_imagepath);
+
+                      //
+
+                      int currentUnix = DateTime.now()
+                          .millisecondsSinceEpoch;
+
+                      final directory =
+                      await getApplicationDocumentsDirectory();
+
+                      String fileFormat = imageFile
+                          .path
+                          .split('.')
+                          .last;
+
+                      print(fileFormat);
+
+                      await imageFile.copy(
+                        '${directory.path}/$currentUnix.$fileFormat',
+                      );
+
+                      refreshAlreadyCapturedImages();
+                    },
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          Icons.circle,
+                          color: Color(0xffB4C5D5),
+                          size: 80,
+                        ),
+                        Icon(
+                          Icons.circle,
+                          color: Colors.white,
+                          size: 65,
+                        ),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _imageFile != null
+                        ? () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              PreviewScreen(
+                                imageFile: _imageFile!,
+                                fileList: allFileList,
+                              ),
+                        ),
+                      );
+                    }
+                        : null,
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius:
+                        BorderRadius.circular(10.0),
+                        border: Border.all(
+                          color: Colors.white,
+                          width: 2,
+                        ),
+                        image: _imageFile != null
+                            ? DecorationImage(
+                          image:
+                          FileImage(_imageFile!),
+                          fit: BoxFit.cover,
+                        )
+                            : null,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ],
+
+        )
+            : Center(
+          child: Text(
+            'LOADING',
+            style: TextStyle(color: Colors.black),
+          ),
+        )
+            : Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(),
+            Text(
+              'Permission denied',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 24,
+              ),
+            ),
+            SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                getPermissionStatus();
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'Give permission',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 24,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   late final OverlayEntry overlayEntry =
-      OverlayEntry(builder: (context) => overlay(context));
+  OverlayEntry(builder: (context) => overlay(context));
 
   void insertOverlay() {
+    ///오버레이 삽입
     // 적절한 타이밍에 호출
     if (!overlayEntry.mounted) {
       OverlayState overlayState = Overlay.of(context)!;
@@ -68,6 +595,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   }
 
   void _launchUrl(String adurl) async {
+    ///url 실행
     Uri _url = Uri.parse(adurl);
     if (await (canLaunchUrl(_url))) {
       await launchUrl(_url, webOnlyWindowName: "_blank");
@@ -77,9 +605,16 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   }
 
   Widget overlay(BuildContext context) {
+    ///광고 오버레이
     return Positioned(
-        height: MediaQuery.of(context).size.width * 0.75,
-        width: MediaQuery.of(context).size.width,
+        height: MediaQuery
+            .of(context)
+            .size
+            .width * 0.75,
+        width: MediaQuery
+            .of(context)
+            .size
+            .width,
         bottom: 0,
         child: Container(
             decoration: const BoxDecoration(
@@ -90,10 +625,10 @@ class TakePictureScreenState extends State<TakePictureScreen> {
                 Center(
                   child: GestureDetector(
                     onTap: () {
-                      _launchUrl(adurl);
+                      _launchUrl(_adurl);
                     },
                     child: Image.network(
-                      adimage,
+                      _adimage,
                     ),
                   ),
                 ),
@@ -117,7 +652,10 @@ class TakePictureScreenState extends State<TakePictureScreen> {
                       ),
                       child: Icon(Icons.close,
                           color: Colors.black,
-                          size: MediaQuery.of(context).size.height * 0.025),
+                          size: MediaQuery
+                              .of(context)
+                              .size
+                              .height * 0.025),
                     ),
                   ),
                 ),
@@ -126,151 +664,143 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   }
 
   void removeOverlay() {
+    ///오버레이 삭제
     // 적절한 타이밍에 호출
     if (overlayEntry.mounted) {
       overlayEntry.remove();
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      // You must wait until the controller is initialized before displaying the
-      // camera preview. Use a FutureBuilder to display a loading spinner until the
-      // controller has finished initializing.
-      body: FutureBuilder<void>(
-        future: _initializeControllerFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            // If the Future is complete, display the preview.
-            return CameraPreview(_controller);
-          } else {
-            // Otherwise, display a loading indicator.
-            return const Center(child: CircularProgressIndicator());
-          }
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        // Provide an onPressed callback.
-        onPressed: () async {
-          // Take the Picture in a try / catch block. If anything goes wrong,
-          // catch the error.
-          try {
-            // Ensure that the camera is initialized.
-            await _initializeControllerFuture;
-            // Attempt to take a picture and get the file `image`
-            // where it was saved.
-            final path = join(
-              // 본 예제에서는 임시 디렉토리에 이미지를 저장합니다. `path_provider`
-              // 플러그인을 사용하여 임시 디렉토리를 찾으세요.
-              (await getApplicationDocumentsDirectory()).path,
-            );
-            final image = await _controller.takePicture();
-
-            print(path + " " + image.path);/*
-            await rotateImage(image.path).then((value) {
-              imagepath = value;
-            }).catchError((onError) {
-              print("rotate error");
-            }); //이미지 정상으로.*/
-
-            print(image.path);
-            // If the picture was taken, display it on a new screen.
-            await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => DisplayPictureScreen(
-                  // Pass the automatically generated path to
-                  // the DisplayPictureScreen widget.
-                  imagePath: image.path,
-                ),
-              ),
-            );
-            await fetchAlbum(image.path).then((value) {
-              //adurl = value.ad_url;
-              //adimage = value.banner_url;
-              adurl='https://pages.coupang.com/p/64094?from=home_C2&traid=home_C2&trcid=11165648';
-              adimage='https://static.coupangcdn.com/ta/cmg_paperboy/image/1657068306263/C2-1-%ED%97%AC%EC%8A%A4%ED%95%98%EC%9A%B0%EC%8A%A4.jpg';
-              insertOverlay();
-            });
-          } catch (e) {
-            // If an error occurs, log the error to the console.
-            print(e);
-          }
-        },
-        child: Container(
-          height: 80.0,
-          width: 80.0,
-          padding: const EdgeInsets.all(1.0),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border:
-            Border.all(color: Colors.black, width: 1.0),
-            color: Colors.white,
-          ),
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border:
-              Border.all(color: Colors.black, width: 3.0),
-            ),
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: (FloatingActionButtonLocation.centerFloat),
-    );
+  void _saveImage(String path) async {
+    ///이미지 갤러리 저장
+    await GallerySaver.saveImage(path)
+        .then((value) => print("save Image"))
+        .catchError((err) {
+      print("error");
+    });
   }
-}
 
-// A widget that displays the picture taken by the user.
-class DisplayPictureScreen extends StatelessWidget {
-  final String imagePath;
+  Future<void> processImage(String path) async {
+    ///face detect
+    if (path == null) {
+      print('path null');
+      return;
+    }
+    final inputImage = InputImage.fromFilePath(path);
+    print("is Busy? ${_isBusy}");
+    if (!_canProcess) return;
+    if (_isBusy) return;
+    _isBusy = true;
 
-  const DisplayPictureScreen({Key? key, required this.imagePath})
-      : super(key: key);
+    final faces = await _faceDetector.processImage(inputImage);
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(),
-        // The image is stored as a file on the device. Use the `Image.file`
-        // constructor with the given path to display the image.
-        body: Image.file(
-          File(imagePath),
-        ));
+    String text = 'face find ${faces.length}\n\n';
+    for (final face in faces) {
+      text += 'face ${face.boundingBox}\n\n';
+    }
+    print(text);
+    if (faces.length > 0) {
+      cropFile(path, faces);
+    }
+    _isBusy = false;
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> cropFile(String path, List<Face> faces) async {
+    ///얼굴 crop
+    late Size imagesize;
+    await imageSize(File(path)).then((value) {
+      print("image Size ${value}");
+      imagesize = value;
+    });
+    File cimage = File(path);
+    if (faces[0].boundingBox.right <= imagesize.width &&
+        faces[0].boundingBox.left >= 0 &&
+        faces[0].boundingBox.top >= 0 &&
+        faces[0].boundingBox.bottom <= imagesize.height) {
+      print("can crop!");
+
+      cimage = await FlutterNativeImage.cropImage(
+          path,
+          faces[0].boundingBox.left.toInt(),
+          faces[0].boundingBox.top.toInt(),
+          faces[0].boundingBox.width.toInt(),
+          faces[0].boundingBox.height.toInt());
+    }
+    compressFile(cimage).then((value) => cimage = value);
+    _saveImage(cimage.path);
+
+    await fetchAlbum(cimage.path).then((value) {
+      /*var ran=Random();
+                                var a=ran.nextInt(5);
+                                if(value.gender==0){
+                                  _adimage=adlist0[a]['banner_url']!;
+                                  _adurl=adlist0[a]['ad_url']!;
+                                }
+                                else{
+                                  _adimage=adlist1[a]['banner_url']!;
+                                  _adurl=adlist1[a]['ad_url']!;
+                                }*/
+      _adurl = value.ad_url;
+      _adimage = value.banner_url;
+      insertOverlay();
+    });
+  }
+
+  Future<File> compressFile(File image) async {
+    return await FlutterNativeImage.compressImage(image.path,
+        quality: 50, percentage: 50);
+  }
+
+  Future<Size> imageSize(File file) {
+    Completer<Size> completer = Completer();
+    Image imageFile = Image.file(file);
+    imageFile.image
+        .resolve(const ImageConfiguration())
+        .addListener(ImageStreamListener((ImageInfo info, bool _) {
+      var myimage = info.image;
+      Size size = Size(myimage.width.toDouble(), myimage.height.toDouble());
+      completer.complete(size);
+    }));
+    return completer.future;
   }
 }
 
 Future<Ad> fetchAlbum(String imagepath) async {
+  ///post
+  //찍은 사진의 이미지 path를 가져옴
+
   Dio dio = new Dio();
   var formData =
-      FormData.fromMap({'image': await MultipartFile.fromFile(imagepath)});
+  FormData.fromMap({'image': await MultipartFile.fromFile(imagepath)});
+  //'image'를 key로 갖는 formdata를 생성
+
   final response = await dio.post(
     'http://3.35.147.134/api/predict',
     data: formData,
   );
+  //dio.post로 서버에 전송. 광고 이미지와 광고url을 받음
 
-  print(response.data);
   if (response.statusCode == 200) {
-    // If the server did return a 200 OK response,
-    // then parse the JSON.
-    final a = Ad.fromJson(response.data);
-    print(a.banner_url);
-    return a;
+    print(response.data);
+    return Ad.fromJson(response.data);
   } else {
-    // If the server did not return a 200 OK response,
-    // then throw an exception.
     throw Exception('Failed to load album');
   }
 }
 
 class Ad {
   final int age;
+  final int gender;
   final String name;
   final String banner_url;
   final String ad_url;
 
   const Ad({
     required this.age,
+    required this.gender,
     required this.name,
     required this.banner_url,
     required this.ad_url,
@@ -279,18 +809,18 @@ class Ad {
   factory Ad.fromJson(Map<String, dynamic> json) {
     return Ad(
       age: json['age'],
+      gender: json['gender'],
       name: json['name'],
       banner_url: json['banner_url'],
       ad_url: json['ad_url'],
     );
   }
 }
-
 Future<String> rotateImage(String path) async {
+  ///사진 좌우반전
   final originalFile = File(path);
   List<int> imageBytes = await originalFile.readAsBytes();
   final originalImage = img.decodeImage(imageBytes);
-
   img.Image fixedImage;
   fixedImage = img.flipHorizontal(originalImage!);
 
@@ -298,298 +828,3 @@ Future<String> rotateImage(String path) async {
   return fixedFile.path;
 }
 
-Future<String> cropImage(String imagepath) async {
-  print(imagepath);
-  final croppedImage = await ImageCropper().cropImage(
-    sourcePath: imagepath,
-    compressQuality: 50,
-  );
-  return croppedImage!.path;
-}
-
-/*final Uri _url = Uri.parse('https://naver.com');
-
-class CameraExample extends StatefulWidget {
-  const CameraExample({Key? key}) : super(key: key);
-
-  @override
-  _CameraExampleState createState() => _CameraExampleState();
-}
-
-class _CameraExampleState extends State<CameraExample> {
-  CameraController? _cameraController;
-  Future<void>? _initCameraControllerFuture;
-  int cameraIndex = 0;
-
-  bool isCapture = false;
-  File? captureImage;
-
-  @override
-  void initState() {
-    super.initState();
-    _initCamera();
-  }
-
-  Future<void> _initCamera() async {
-    final cameras = await availableCameras();
-    _cameraController =
-        CameraController(cameras[cameraIndex], ResolutionPreset.veryHigh);
-    _initCameraControllerFuture = _cameraController!.initialize().then((value) {
-      setState(() {});
-    });
-  }
-
-  @override
-  void dispose() {
-    _cameraController!.dispose();
-    super.dispose();
-  }
-
-  void _launchUrl() async {
-    if (await (canLaunchUrl(_url))) {
-      await launchUrl(_url, webOnlyWindowName: "_blank");
-    } else {
-      throw 'Could not launch $_url';
-    }
-  }
-
-  void _showOverlay(BuildContext context) async {
-    // Declaring and Initializing OverlayState
-    // and OverlayEntry objects
-    OverlayState? overlayState = Overlay.of(context);
-    OverlayEntry? overlayEntry;
-    overlayEntry = OverlayEntry(builder: (context) {
-      return Positioned(
-        height: MediaQuery.of(context).size.width * 0.75,
-        width: MediaQuery.of(context).size.width,
-        bottom: 0,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(50),
-            color: Colors.white,
-          ),
-          child: Stack(
-            children: [
-              GestureDetector(
-                onTap: () {
-                  _launchUrl();
-                },
-                child: Image.asset(
-                  'assets/eye.png',
-                ),
-              ),
-              Positioned(
-                right: 20,
-                top: 20,
-                child: GestureDetector(
-                  onTap: () {
-                    // When the icon is pressed the OverlayEntry
-                    // is removed from Overlay
-                    overlayEntry?.remove();
-                  },
-                  child: Container(
-                    height: 30.0,
-                    width: 30.0,
-                    padding: const EdgeInsets.all(1.0),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.black, width: 1.0),
-                      color: Colors.white,
-                    ),
-                    child: Icon(Icons.close,
-                        color: Colors.black,
-                        size: MediaQuery.of(context).size.height * 0.025),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    });
-    overlayState?.insert(overlayEntry);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Size size = MediaQuery.of(context).size;
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: isCapture
-          ? Column(
-              // 촬영 된 이미지 출력
-              children: [
-                Flexible(
-                  flex: 3,
-                  fit: FlexFit.tight,
-                  child: SizedBox(
-                    width: size.width,
-                    height: size.width,
-                    child: ClipRect(
-                      child: FittedBox(
-                        fit: BoxFit.fitWidth,
-                        child: SizedBox(
-                          width: size.width,
-                          child: AspectRatio(
-                            aspectRatio:
-                                1 / _cameraController!.value.aspectRatio,
-                            child: Container(
-                              width: size.width,
-                              decoration: BoxDecoration(
-                                image: DecorationImage(
-                                  image: MemoryImage(
-                                      captureImage!.readAsBytesSync()),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 48.0),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            // 재촬영 선택시 카메라 삭제 및 상태 변경
-                            captureImage!.delete();
-                            captureImage = null;
-                            setState(() {
-                              isCapture = false;
-                            });
-                          },
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Icon(
-                                  Icons.arrow_back,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(height: 16.0),
-                                Text(
-                                  "다시 찍기",
-                                  style: TextStyle(
-                                      fontSize: 16.0,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            )
-          : Column(
-              children: [
-                Flexible(
-                  flex: 3,
-                  fit: FlexFit.tight,
-                  child: FutureBuilder<void>(
-                    future: _initCameraControllerFuture,
-                    builder: (BuildContext context, AsyncSnapshot snapshot) {
-                      if (snapshot.connectionState == ConnectionState.done) {
-                        return SizedBox(
-                          width: size.width,
-                          height: size.width,
-                          child: ClipRect(
-                            child: FittedBox(
-                              fit: BoxFit.fitWidth,
-                              child: SizedBox(
-                                width: size.width,
-                                child: AspectRatio(
-                                    aspectRatio: 1 /
-                                        _cameraController!.value.aspectRatio,
-                                    child: CameraPreview(_cameraController!)),
-                              ),
-                            ),
-                          ),
-                        );
-                      } else {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                    },
-                  ),
-                ),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 48.0),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            try {
-                              await _cameraController!
-                                  .takePicture()
-                                  .then((value) {
-                                captureImage = File(value.path);
-                              });
-                              // 화면 상태 변경 및 이미지 저장
-                              setState(() {
-                                isCapture = true;
-                              });
-                              _showOverlay(context);
-                            } catch (e) {
-                              print("$e");
-                            }
-                          },
-                          child: Container(
-                            height: 80.0,
-                            width: 80.0,
-                            padding: const EdgeInsets.all(1.0),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border:
-                                  Border.all(color: Colors.black, width: 1.0),
-                              color: Colors.white,
-                            ),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.black, width: 3.0),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: IconButton(
-                            onPressed: () async {
-                              //await, async 비동기 처리
-                              // 후면 카메라 <-> 전면 카메라 변경
-                              cameraIndex = cameraIndex == 0 ? 1 : 0;
-                              await _initCamera();
-                            },
-                            icon: const Icon(
-                              Icons.flip_camera_android,
-                              color: Colors.white,
-                              size: 34.0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-    );
-  }
-}
-*/

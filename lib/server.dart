@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-Future<Ad> fetchAlbum() async {
+Future<Ad> fetchAlbum() async {///여기선 사용x
   final response = await http
       .get(Uri.parse('http://ec2-52-79-226-24.ap-northeast-2.compute.amazonaws.com/'));
 
