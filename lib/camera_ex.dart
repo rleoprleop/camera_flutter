@@ -440,32 +440,6 @@ class _CameraScreenState extends State<CameraScreen>
                       File imageFile =
                       File(rawImage!.path);
 
-                      //
-                      print(_isRearCameraSelected);
-                      if (_isRearCameraSelected == 0) {
-                        _saveImage(rawImage.path);
-                        //이미지 정상으로.
-                        await rotateImage(rawImage.path).then((value) {
-                          _imagepath = value;
-                        }).catchError((onError) {
-                          print("rotate error");
-                        });
-                      } else {
-                        await rotateImage(rawImage.path).then((value) {
-                          _imagepath = value;
-                        }).catchError((onError) {
-                          print("rotate error");
-                        });
-                        _saveImage(rawImage.path);
-                        //이미지 정상으로.
-                      }
-
-                      print(_imagepath);
-                      print("resolution ${controller?.resolutionPreset.index}");
-                      await processImage(_imagepath);
-
-                      //
-
                       int currentUnix = DateTime.now()
                           .millisecondsSinceEpoch;
 
@@ -479,9 +453,32 @@ class _CameraScreenState extends State<CameraScreen>
 
                       print(fileFormat);
 
-                      await imageFile.copy(
-                        '${directory.path}/$currentUnix.$fileFormat',
-                      );
+                      if (_isRearCameraSelected == true) {
+                        _saveImage(rawImage.path);
+                        await imageFile.copy(
+                          '${directory.path}/$currentUnix.$fileFormat',
+                        );
+                        //이미지 정상으로.
+                        await rotateImage(rawImage.path).then((value) {
+                          _imagepath = value;
+                        }).catchError((onError) {
+                          print("rotate error");
+                        });
+                      } else {
+                        await rotateImage(rawImage.path).then((value) {
+                          _imagepath = value;
+                        }).catchError((onError) {
+                          print("rotate error");
+                        });
+                        _saveImage(rawImage.path);
+                        await imageFile.copy(
+                          '${directory.path}/$currentUnix.$fileFormat',
+                        );
+                        //이미지 정상으로.
+                      }
+
+                      await processImage(_imagepath);
+
 
                       refreshAlreadyCapturedImages();
                     },
