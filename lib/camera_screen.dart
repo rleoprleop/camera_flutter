@@ -9,14 +9,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:gallery_saver/gallery_saver.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_native_image/flutter_native_image.dart';
-import 'package:dio/dio.dart';
 
 import '../main.dart';
+import '../overlay.dart';
+import 'model/DataManager.dart';
+
 
 class CameraScreen extends StatefulWidget {
   @override
@@ -25,6 +26,9 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen>
     with WidgetsBindingObserver {
+
+  DataManager _dataManager = new DataManager();
+
   CameraController? controller;
 
   File? _imageFile;
@@ -39,8 +43,6 @@ class _CameraScreenState extends State<CameraScreen>
   double _maxAvailableZoom = 1.0;
 
   //
-  late String _adurl;
-  late String _adimage;
   late String _imagepath;
 
   final bool _canProcess = true;
@@ -578,96 +580,6 @@ class _CameraScreenState extends State<CameraScreen>
     );
   }
 
-
-  late final OverlayEntry overlayEntry =
-  OverlayEntry(builder: (context) => overlay(context));
-
-  void insertOverlay() {
-    ///오버레이 삽입
-    // 적절한 타이밍에 호출
-    if (!overlayEntry.mounted) {
-      OverlayState overlayState = Overlay.of(context)!;
-      overlayState.insert(overlayEntry);
-    }
-  }
-
-  void _launchUrl(String adurl) async {
-    ///url 실행
-    Uri _url = Uri.parse(adurl);
-    if (await (canLaunchUrl(_url))) {
-      await launchUrl(_url, webOnlyWindowName: "_blank");
-    } else {
-      throw 'Could not launch $_url';
-    }
-  }
-
-  Widget overlay(BuildContext context) {
-    ///광고 오버레이
-    return Positioned(
-        height: MediaQuery
-            .of(context)
-            .size
-            .width * 0.75,
-        width: MediaQuery
-            .of(context)
-            .size
-            .width,
-        bottom: 0,
-        child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      _launchUrl(_adurl);
-                    },
-                    child: Image.network(
-                      _adimage,
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 20,
-                  top: 20,
-                  child: GestureDetector(
-                    onTap: () {
-                      // When the icon is pressed the OverlayEntry
-                      // is removed from Overlay
-                      removeOverlay();
-                    },
-                    child: Container(
-                      height: 30.0,
-                      width: 30.0,
-                      padding: const EdgeInsets.all(1.0),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.black, width: 1.0),
-                        color: Colors.white,
-                      ),
-                      child: Icon(Icons.close,
-                          color: Colors.black,
-                          size: MediaQuery
-                              .of(context)
-                              .size
-                              .height * 0.025),
-                    ),
-                  ),
-                ),
-              ],
-            )));
-  }
-
-  void removeOverlay() {
-    ///오버레이 삭제
-    // 적절한 타이밍에 호출
-    if (overlayEntry.mounted) {
-      overlayEntry.remove();
-    }
-  }
-
   void _saveImage(String path) async {
     ///이미지 갤러리 저장
     await GallerySaver.saveImage(path)
@@ -729,20 +641,9 @@ class _CameraScreenState extends State<CameraScreen>
     compressFile(cimage).then((value) => cimage = value);
     _saveImage(cimage.path);
 
-    await fetchAlbum(cimage.path).then((value) {
-      /*var ran=Random();
-                                var a=ran.nextInt(5);
-                                if(value.gender==0){
-                                  _adimage=adlist0[a]['banner_url']!;
-                                  _adurl=adlist0[a]['ad_url']!;
-                                }
-                                else{
-                                  _adimage=adlist1[a]['banner_url']!;
-                                  _adurl=adlist1[a]['ad_url']!;
-                                }*/
-      _adurl = value.ad_url;
-      _adimage = value.banner_url;
-      insertOverlay();
+    await _dataManager.fetchModel(cimage.path).then((value) {
+      insertOverlay(context);
+      print("FETCH!!");
     });
   }
 
@@ -765,54 +666,6 @@ class _CameraScreenState extends State<CameraScreen>
   }
 }
 
-Future<Ad> fetchAlbum(String imagepath) async {
-  ///post
-  //찍은 사진의 이미지 path를 가져옴
-
-  Dio dio = new Dio();
-  var formData =
-  FormData.fromMap({'image': await MultipartFile.fromFile(imagepath)});
-  //'image'를 key로 갖는 formdata를 생성
-
-  final response = await dio.post(
-    'http://3.35.147.134/api/predict',
-    data: formData,
-  );
-  //dio.post로 서버에 전송. 광고 이미지와 광고url을 받음
-
-  if (response.statusCode == 200) {
-    print(response.data);
-    return Ad.fromJson(response.data);
-  } else {
-    throw Exception('Failed to load album');
-  }
-}
-
-class Ad {
-  final int age;
-  final int gender;
-  final String name;
-  final String banner_url;
-  final String ad_url;
-
-  const Ad({
-    required this.age,
-    required this.gender,
-    required this.name,
-    required this.banner_url,
-    required this.ad_url,
-  });
-
-  factory Ad.fromJson(Map<String, dynamic> json) {
-    return Ad(
-      age: json['age'],
-      gender: json['gender'],
-      name: json['name'],
-      banner_url: json['banner_url'],
-      ad_url: json['ad_url'],
-    );
-  }
-}
 Future<String> rotateImage(String path) async {
   ///사진 좌우반전
   final originalFile = File(path);
@@ -824,4 +677,3 @@ Future<String> rotateImage(String path) async {
   final fixedFile = await originalFile.writeAsBytes(img.encodeJpg(fixedImage));
   return fixedFile.path;
 }
-

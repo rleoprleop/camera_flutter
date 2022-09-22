@@ -5,7 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_image/flutter_native_image.dart';
 import 'package:gallery_saver/gallery_saver.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:image/image.dart' as img;
 import 'package:example/camera_screen.dart';
+
+import 'overlay.dart';
 
 
 void _saveImage(String path) async {
@@ -17,33 +20,6 @@ void _saveImage(String path) async {
   });
 }
 
-Future<void> processImage(String path) async {
-  ///face detect
-  if (path == null) {
-    print('path null');
-    return;
-  }
-  final inputImage = InputImage.fromFilePath(path);
-  print("is Busy? ${_isBusy}");
-  if (!_canProcess) return;
-  if (_isBusy) return;
-  _isBusy = true;
-
-  final faces = await _faceDetector.processImage(inputImage);
-
-  String text = 'face find ${faces.length}\n\n';
-  for (final face in faces) {
-    text += 'face ${face.boundingBox}\n\n';
-  }
-  print(text);
-  if (faces.length > 0) {
-    cropFile(path, faces);
-  }
-  _isBusy = false;
-  if (mounted) {
-    setState(() {});
-  }
-}
 
 Future<void> cropFile(String path, List<Face> faces) async {
   ///얼굴 crop
@@ -68,23 +44,8 @@ Future<void> cropFile(String path, List<Face> faces) async {
   }
   compressFile(cimage).then((value) => cimage = value);
   _saveImage(cimage.path);
-
-  await fetchAlbum(cimage.path).then((value) {
-    /*var ran=Random();
-                                var a=ran.nextInt(5);
-                                if(value.gender==0){
-                                  _adimage=adlist0[a]['banner_url']!;
-                                  _adurl=adlist0[a]['ad_url']!;
-                                }
-                                else{
-                                  _adimage=adlist1[a]['banner_url']!;
-                                  _adurl=adlist1[a]['ad_url']!;
-                                }*/
-    _adurl = value.ad_url;
-    _adimage = value.banner_url;
-    insertOverlay();
-  });
 }
+
 
 Future<File> compressFile(File image) async {
   return await FlutterNativeImage.compressImage(image.path,
@@ -102,4 +63,16 @@ Future<Size> imageSize(File file) {
     completer.complete(size);
   }));
   return completer.future;
+}
+
+Future<String> rotateImage(String path) async {
+  ///사진 좌우반전
+  final originalFile = File(path);
+  List<int> imageBytes = await originalFile.readAsBytes();
+  final originalImage = img.decodeImage(imageBytes);
+  img.Image fixedImage;
+  fixedImage = img.flipHorizontal(originalImage!);
+
+  final fixedFile = await originalFile.writeAsBytes(img.encodeJpg(fixedImage));
+  return fixedFile.path;
 }

@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:example/preview_screen.dart';
 
@@ -7,7 +6,6 @@ class CapturesScreen extends StatelessWidget {
   final List<File> imageFileList;
 
   const CapturesScreen({required this.imageFileList});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'model/DataManager.dart';
 
 class overlay extends StatelessWidget {
-  const overlay({Key? key}) : super(key: key);
+  overlay(BuildContext context, {Key? key}) : super(key: key);
+
+  DataManager _dataManager=new DataManager();
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +28,10 @@ class overlay extends StatelessWidget {
                 Center(
                   child: GestureDetector(
                     onTap: () {
-                      _launchUrl(_adurl);
+                      _launchUrl(_dataManager.getAdUrl());
                     },
                     child: Image.network(
-                      _adimage,
+                      _dataManager.getImageUrl(),
                     ),
                   ),
                 ),
@@ -71,15 +74,6 @@ class overlay extends StatelessWidget {
     }
   }
 
-  void insertOverlay() {
-    ///오버레이 삽입
-    // 적절한 타이밍에 호출
-    if (!overlayEntry.mounted) {
-      OverlayState overlayState = Overlay.of(context)!;
-      overlayState.insert(overlayEntry);
-    }
-  }
-
   void _launchUrl(String adurl) async {
     ///url 실행
     Uri _url = Uri.parse(adurl);
@@ -93,4 +87,13 @@ class overlay extends StatelessWidget {
 }
 
 late final OverlayEntry overlayEntry =
-OverlayEntry(builder: (context) => const overlay());
+OverlayEntry(builder: (context) => overlay(context));
+
+void insertOverlay(BuildContext context) {
+  ///오버레이 삽입
+  // 적절한 타이밍에 호출
+  if (!overlayEntry.mounted) {
+    OverlayState overlayState = Overlay.of(context)!;
+    overlayState.insert(overlayEntry);
+  }
+}
