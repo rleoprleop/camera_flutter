@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:example/preview_screen.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -459,13 +460,13 @@ class _CameraScreenState extends State<CameraScreen>
                           '${directory.path}/$currentUnix.$fileFormat',
                         );
                         //이미지 정상으로.
-                        await rotateImage(rawImage.path).then((value) {
+                        await compute(rotateImage,rawImage.path).then((value) {
                           _imagepath = value;
                         }).catchError((onError) {
                           print("rotate error");
                         });
                       } else {
-                        await rotateImage(rawImage.path).then((value) {
+                        await compute(rotateImage,rawImage.path).then((value) {
                           _imagepath = value;
                         }).catchError((onError) {
                           print("rotate error");
