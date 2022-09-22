@@ -4,7 +4,8 @@ import 'package:dio/dio.dart';
 
 
 class DataManager {
-  late Model _model;
+  static late Model model;
+
   Future<void> fetchModel(String imagepath) async {
     ///post
     //찍은 사진의 이미지 path를 가져옴
@@ -22,22 +23,21 @@ class DataManager {
 
     if (response.statusCode == 200) {
       print(response.data);
-      _model=Model.fromJson(response.data);
+      model=Model.fromJson(response.data);
     } else {
       throw Exception('Failed to load album');
     }
   }
 
   String getAdUrl(){
-    return _model.ad_url;
+    return model.ad_url;
   }
 
   String getImageUrl(){
-    return _model.banner_url;
+    return model.banner_url;
   }
 
   String getText(){
-    return "${_model.age}대 ${_model.gender}에게 추천되는 카테고리는 ${_model.name}입니다.";
+    return "${model.age}대 ${model.gender}에게 추천되는 카테고리는 ${model.name}입니다.";
   }
-
 }
