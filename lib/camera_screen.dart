@@ -42,7 +42,6 @@ class _CameraScreenState extends State<CameraScreen>
   late String _adurl;
   late String _adimage;
   late String _imagepath;
-  late Size size;
 
   final bool _canProcess = true;
   late bool _isBusy = false;
@@ -419,7 +418,7 @@ class _CameraScreenState extends State<CameraScreen>
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.circle,
                           color: Color(0xffB4C5D5),
                           size: 60,
