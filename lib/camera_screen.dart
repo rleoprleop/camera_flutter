@@ -608,33 +608,34 @@ class _CameraScreenState extends State<CameraScreen>
                     child: Text(
                       _dataManager.getText(),
                       style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.black,
+                        fontSize: 18,
+                        color: Colors.black
                       ),
                     ),
                   ),
 
                 ),
                 Container(
+                  width: double.infinity,
+                  height: MediaQuery.of(context).size.height*0.5-MediaQuery.of(context).size.width*0.45,
                   child: GestureDetector(
                     onTap: () {
                       _launchUrl(_dataManager.getAdUrl());
                     },
                     child: Image.network(
                       _dataManager.getImageUrl(),
+                      fit: BoxFit.fill,
                     ),
                   ),
                 ),
                 Positioned(
-                  height: MediaQuery.of(context).size.width*0.2,
+                  height: MediaQuery.of(context).size.width*0.25,
                   bottom: 0,
                   child: Row(
                     children: [
                       GestureDetector(
                         onTap: () {
-                          // When the icon is pressed the OverlayEntry
-                          // is removed from Overlay
-                          removeOverlay();
+                          _launchUrl(_dataManager.getAdUrl());
                         },
                         child: Container(
                           height: MediaQuery.of(context).size.width*0.15,
@@ -650,7 +651,7 @@ class _CameraScreenState extends State<CameraScreen>
                               child: Text(
                                 "광고로 이동!",
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 18,
                                   color:Colors.white,
                                 ),
                               ),
@@ -677,7 +678,7 @@ class _CameraScreenState extends State<CameraScreen>
                             child: Text(
                               "안볼래요",
                               style: TextStyle(
-                                fontSize: 20,
+                                fontSize: 18,
                                 color:Colors.white,
                               ),
                             ),

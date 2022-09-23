@@ -38,6 +38,9 @@ class DataManager {
   }
 
   String getText(){
-    return "${model.age}대 ${model.gender}에게 추천되는 카테고리는 ${model.name}입니다.";
+    String gender = model.gender==0?"남성":"여성";
+    String age;
+
+    return "${model.age}대 ${gender}에게 추천되는 카테고리는 ${model.name}입니다.";
   }
 }
