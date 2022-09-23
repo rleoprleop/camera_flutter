@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:example/preview_screen.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,9 +14,9 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:gallery_saver/gallery_saver.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter_native_image/flutter_native_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
-import '../overlay.dart';
 import 'model/DataManager.dart';
 
 
@@ -27,7 +28,8 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen>
     with WidgetsBindingObserver {
 
-  DataManager _dataManager = new DataManager();
+  DataManager _dataManager=new DataManager();
+
 
   CameraController? controller;
 
@@ -110,7 +112,7 @@ class _CameraScreenState extends State<CameraScreen>
 
   Future<XFile?> takePicture() async {
     final CameraController? cameraController = controller;
-
+    controller?.setFlashMode(FlashMode.off);
     if (cameraController!.value.isTakingPicture) {
       // A capture is already pending, do nothing.
       return null;
@@ -146,7 +148,6 @@ class _CameraScreenState extends State<CameraScreen>
     if (mounted) {
       setState(() {
         controller = cameraController;
-        controller?.setFlashMode(FlashMode.off);
       });
     }
 
@@ -580,6 +581,148 @@ class _CameraScreenState extends State<CameraScreen>
     );
   }
 
+
+  Widget overlay(BuildContext context) {
+    return Positioned(
+        height: MediaQuery
+            .of(context)
+            .size
+            .height * 0.5,
+        width: MediaQuery
+            .of(context)
+            .size
+            .width,
+        bottom: 0,
+        child: Container(
+            decoration: const BoxDecoration(
+              borderRadius: BorderRadius.only(topRight: Radius.circular(10),topLeft: Radius.circular(10)),
+              color: Colors.white,
+            ),
+            child: Column(
+              children: [
+                Positioned(
+                  height: MediaQuery.of(context).size.width*0.15,
+                  width: double.infinity,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      _dataManager.getText(),
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.black
+                      ),
+                    ),
+                  ),
+
+                ),
+                Container(
+                  width: double.infinity,
+                  height: MediaQuery.of(context).size.height*0.5-MediaQuery.of(context).size.width*0.45,
+                  child: GestureDetector(
+                    onTap: () {
+                      _launchUrl(_dataManager.getAdUrl());
+                    },
+                    child: Image.network(
+                      _dataManager.getImageUrl(),
+                      fit: BoxFit.fill,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  height: MediaQuery.of(context).size.width*0.25,
+                  bottom: 0,
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          _launchUrl(_dataManager.getAdUrl());
+                        },
+                        child: Container(
+                          height: MediaQuery.of(context).size.width*0.15,
+                          width: MediaQuery.of(context).size.width*0.45,
+                          padding: const EdgeInsets.all(10.0),
+                          margin: const EdgeInsets.all(10.0),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.black, width: 1.0),
+                            borderRadius: BorderRadius.circular(10),
+                            color: Color(0xffB4C5D5),
+                          ),
+                            child: Center(
+                              child: Text(
+                                "광고로 이동!",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color:Colors.white,
+                                ),
+                              ),
+                            )
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          // When the icon is pressed the OverlayEntry
+                          // is removed from Overlay
+                          removeOverlay();
+                        },
+                        child: Container(
+                          height: MediaQuery.of(context).size.width*0.15,
+                          width: MediaQuery.of(context).size.width*0.45,
+                          padding: const EdgeInsets.all(2.0),
+                          margin: const EdgeInsets.all(2.0),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.black, width: 1.0),
+                            borderRadius: BorderRadius.circular(10),
+                            color: Color(0xffB4C5D5),
+                          ),
+                          child: Center(
+                            child: Text(
+                              "안볼래요",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color:Colors.white,
+                              ),
+                            ),
+                          )
+                        ),
+                      ),
+                    ],
+                  )
+                ),
+              ],
+            )));
+  }
+
+  late final OverlayEntry overlayEntry =
+  OverlayEntry(builder: (context) => overlay(context));
+
+  void insertOverlay() {
+    ///오버레이 삽입
+    // 적절한 타이밍에 호출
+    if (!overlayEntry.mounted) {
+      OverlayState overlayState = Overlay.of(context)!;
+      overlayState.insert(overlayEntry);
+    }
+  }
+
+  void removeOverlay() {
+    ///오버레이 삭제
+    // 적절한 타이밍에 호출
+    if (overlayEntry.mounted) {
+      overlayEntry.remove();
+    }
+  }
+
+  void _launchUrl(String adurl) async {
+    ///url 실행
+    Uri _url = Uri.parse(adurl);
+    if (await (canLaunchUrl(_url))) {
+      await launchUrl(_url, webOnlyWindowName: "_blank");
+    } else {
+      throw 'Could not launch $_url';
+    }
+  }
+
+
   void _saveImage(String path) async {
     ///이미지 갤러리 저장
     await GallerySaver.saveImage(path)
@@ -642,7 +785,7 @@ class _CameraScreenState extends State<CameraScreen>
     _saveImage(cimage.path);
 
     await _dataManager.fetchModel(cimage.path).then((value) {
-      insertOverlay(context);
+      insertOverlay();
       print("FETCH!!");
     });
   }
