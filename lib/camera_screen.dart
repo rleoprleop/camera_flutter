@@ -552,20 +552,20 @@ class _CameraScreenState extends State<CameraScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Row(),
-            Text(
+            const Text(
               'Permission denied',
               style: TextStyle(
                 color: Colors.black,
                 fontSize: 24,
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
                 getPermissionStatus();
               },
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
+              child: const Padding(
+                padding: EdgeInsets.all(8.0),
                 child: Text(
                   'Give permission',
                   style: TextStyle(
@@ -593,31 +593,29 @@ class _CameraScreenState extends State<CameraScreen>
             .size
             .width,
         bottom: 0,
-        child: Container(
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.only(topRight: Radius.circular(10),topLeft: Radius.circular(10)),
-              color: Colors.white,
-            ),
-            child: Column(
+        child: Material(
+            borderRadius: const BorderRadius.only(topRight: Radius.circular(10),topLeft: Radius.circular(10)),
+            color: Colors.white,
+            child: Stack(
               children: [
                 Positioned(
+                  top: 0,
                   height: MediaQuery.of(context).size.width*0.15,
                   width: double.infinity,
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     child: Text(
                       _dataManager.getText(),
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.black
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black
                       ),
                     ),
                   ),
 
                 ),
-                Container(
-                  width: double.infinity,
-                  height: MediaQuery.of(context).size.height*0.5-MediaQuery.of(context).size.width*0.45,
+                Positioned.fill(
                   child: GestureDetector(
                     onTap: () {
                       _launchUrl(_dataManager.getAdUrl());
@@ -629,67 +627,68 @@ class _CameraScreenState extends State<CameraScreen>
                   ),
                 ),
                 Positioned(
-                  height: MediaQuery.of(context).size.width*0.25,
-                  bottom: 0,
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () {
-                          _launchUrl(_dataManager.getAdUrl());
-                        },
-                        child: Container(
-                          height: MediaQuery.of(context).size.width*0.15,
-                          width: MediaQuery.of(context).size.width*0.45,
-                          padding: const EdgeInsets.all(10.0),
-                          margin: const EdgeInsets.all(10.0),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.black, width: 1.0),
-                            borderRadius: BorderRadius.circular(10),
-                            color: Color(0xffB4C5D5),
-                          ),
-                            child: Center(
-                              child: Text(
-                                "광고로 이동!",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color:Colors.white,
+                    height: MediaQuery.of(context).size.width*0.25,
+                    bottom: 0,
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            _launchUrl(_dataManager.getAdUrl());
+                          },
+                          child: Container(
+                              height: MediaQuery.of(context).size.width*0.15,
+                              width: MediaQuery.of(context).size.width*0.45,
+                              padding: const EdgeInsets.all(10.0),
+                              margin: const EdgeInsets.all(10.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: Color(0xffB4C5D5),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  "광고로 이동!",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color:Colors.white,
+                                  ),
                                 ),
-                              ),
-                            )
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          // When the icon is pressed the OverlayEntry
-                          // is removed from Overlay
-                          removeOverlay();
-                        },
-                        child: Container(
-                          height: MediaQuery.of(context).size.width*0.15,
-                          width: MediaQuery.of(context).size.width*0.45,
-                          padding: const EdgeInsets.all(2.0),
-                          margin: const EdgeInsets.all(2.0),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.black, width: 1.0),
-                            borderRadius: BorderRadius.circular(10),
-                            color: Color(0xffB4C5D5),
+                              )
                           ),
-                          child: Center(
-                            child: Text(
-                              "안볼래요",
-                              style: TextStyle(
-                                fontSize: 18,
-                                color:Colors.white,
-                              ),
-                            ),
-                          )
                         ),
-                      ),
-                    ],
-                  )
+                        GestureDetector(
+                          onTap: () {
+                            // When the icon is pressed the OverlayEntry
+                            // is removed from Overlay
+                            removeOverlay();
+                          },
+                          child: Container(
+                              height: MediaQuery.of(context).size.width*0.15,
+                              width: MediaQuery.of(context).size.width*0.45,
+                              padding: const EdgeInsets.all(2.0),
+                              margin: const EdgeInsets.all(2.0),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: const Color(0xffB4C5D5),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  "안볼래요",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color:Colors.white,
+                                  ),
+                                ),
+                              )
+                          ),
+                        ),
+                      ],
+                    )
                 ),
               ],
-            )));
+            )),
+        );
   }
 
   late final OverlayEntry overlayEntry =
