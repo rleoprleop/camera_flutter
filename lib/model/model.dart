@@ -1,6 +1,6 @@
 class Model {
   final int age;
-  final int gender;
+  final String gender;
   final String name;
   final String banner_url;
   final String ad_url;
