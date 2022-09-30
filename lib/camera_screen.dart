@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:camera/camera.dart';
 import 'package:example/preview_screen.dart';
@@ -19,7 +20,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import 'model/DataManager.dart';
 
-
 class CameraScreen extends StatefulWidget {
   @override
   _CameraScreenState createState() => _CameraScreenState();
@@ -27,9 +27,7 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen>
     with WidgetsBindingObserver {
-
-  DataManager _dataManager=new DataManager();
-
+  DataManager _dataManager = new DataManager();
 
   CameraController? controller;
 
@@ -56,6 +54,7 @@ class _CameraScreenState extends State<CameraScreen>
       enableTracking: true,
     ),
   );
+
   // Current values
   double _currentZoomLevel = 1.0;
   double _currentExposureOffset = 0.0;
@@ -100,11 +99,10 @@ class _CameraScreenState extends State<CameraScreen>
 
     if (fileNames.isNotEmpty) {
       final recentFile =
-      fileNames.reduce((curr, next) => curr[0] > next[0] ? curr : next);
+          fileNames.reduce((curr, next) => curr[0] > next[0] ? curr : next);
       String recentFileName = recentFile[1];
 
       _imageFile = File('${directory.path}/$recentFileName');
-
 
       setState(() {});
     }
@@ -235,464 +233,455 @@ class _CameraScreenState extends State<CameraScreen>
         backgroundColor: Colors.white,
         body: _isCameraPermissionGranted
             ? _isCameraInitialized
-            ? Column(
-          children: [
-            AspectRatio(
-              aspectRatio: 1 / controller!.value.aspectRatio,
-              child: Stack(
-                children: [
-                  CameraPreview(
-                    controller!,
-                    child: LayoutBuilder(builder:
-                        (BuildContext context,
-                        BoxConstraints constraints) {
-                      return GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTapDown: (details) =>
-                            onViewFinderTap(details, constraints),
-                      );
-                    }),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      16.0,
-                      8.0,
-                      16.0,
-                      8.0,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black87,
-                              borderRadius:
-                              BorderRadius.circular(10.0),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.only(
-                                left: 8.0,
-                                right: 8.0,
-                              ),
-                              child: DropdownButton<ResolutionPreset>(
-                                dropdownColor: Colors.black87,
-                                underline: Container(),
-                                value: currentResolutionPreset,
-                                items: [
-                                  for (ResolutionPreset preset
-                                  in resolutionPresets)
-                                    DropdownMenuItem(
-                                      child: Text(
-                                        preset
-                                            .toString()
-                                            .split('.')[1]
-                                            .toUpperCase(),
-                                        style: TextStyle(
-                                            color: Colors.white),
-                                      ),
-                                      value: preset,
-                                    )
-                                ],
-                                onChanged: (value) {
-                                  setState(() {
-                                    currentResolutionPreset = value!;
-                                    _isCameraInitialized = false;
-                                  });
-                                  onNewCameraSelected(
-                                      controller!.description);
-                                },
-                                hint: Text("Select item"),
-                              ),
-                            ),
-                          ),
-                        ),
-                        // Spacer(),
-                        Padding(
-                          padding: const EdgeInsets.only(
-                              right: 8.0, top: 16.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius:
-                              BorderRadius.circular(10.0),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text(
-                                _currentExposureOffset
-                                    .toStringAsFixed(1) +
-                                    'x',
-                                style: TextStyle(color: Colors.black),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: RotatedBox(
-                            quarterTurns: 3,
-                            child: Container(
-                              height: 30,
-                              child: Slider(
-                                value: _currentExposureOffset,
-                                min: _minAvailableExposureOffset,
-                                max: _maxAvailableExposureOffset,
-                                activeColor: Colors.white,
-                                inactiveColor: Colors.white30,
-                                onChanged: (value) async {
-                                  setState(() {
-                                    _currentExposureOffset = value;
-                                  });
-                                  await controller!
-                                      .setExposureOffset(value);
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        Row(
+                ? Column(
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 1 / controller!.value.aspectRatio,
+                        child: Stack(
                           children: [
-                            Expanded(
-                              child: Slider(
-                                value: _currentZoomLevel,
-                                min: _minAvailableZoom,
-                                max: _maxAvailableZoom,
-                                activeColor: Colors.white,
-                                inactiveColor: Colors.white30,
-                                onChanged: (value) async {
-                                  setState(() {
-                                    _currentZoomLevel = value;
-                                  });
-                                  await controller!
-                                      .setZoomLevel(value);
-                                },
-                              ),
+                            CameraPreview(
+                              controller!,
+                              child: LayoutBuilder(builder:
+                                  (BuildContext context,
+                                      BoxConstraints constraints) {
+                                return GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTapDown: (details) =>
+                                      onViewFinderTap(details, constraints),
+                                );
+                              }),
                             ),
                             Padding(
-                              padding:
-                              const EdgeInsets.only(right: 8.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius:
-                                  BorderRadius.circular(10.0),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(
-                                    _currentZoomLevel
-                                        .toStringAsFixed(1) +
-                                        'x',
-                                    style: TextStyle(
-                                        color: Colors.white),
+                              padding: const EdgeInsets.fromLTRB(
+                                16.0,
+                                8.0,
+                                16.0,
+                                8.0,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Align(
+                                    alignment: Alignment.topRight,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.black87,
+                                        borderRadius:
+                                            BorderRadius.circular(10.0),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          left: 8.0,
+                                          right: 8.0,
+                                        ),
+                                        child: DropdownButton<ResolutionPreset>(
+                                          dropdownColor: Colors.black87,
+                                          underline: Container(),
+                                          value: currentResolutionPreset,
+                                          items: [
+                                            for (ResolutionPreset preset
+                                                in resolutionPresets)
+                                              DropdownMenuItem(
+                                                child: Text(
+                                                  preset
+                                                      .toString()
+                                                      .split('.')[1]
+                                                      .toUpperCase(),
+                                                  style: TextStyle(
+                                                      color: Colors.white),
+                                                ),
+                                                value: preset,
+                                              )
+                                          ],
+                                          onChanged: (value) {
+                                            setState(() {
+                                              currentResolutionPreset = value!;
+                                              _isCameraInitialized = false;
+                                            });
+                                            onNewCameraSelected(
+                                                controller!.description);
+                                          },
+                                          hint: Text("Select item"),
+                                        ),
+                                      ),
+                                    ),
                                   ),
+                                  // Spacer(),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        right: 8.0, top: 16.0),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(10.0),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Text(
+                                          _currentExposureOffset
+                                                  .toStringAsFixed(1) +
+                                              'x',
+                                          style: TextStyle(color: Colors.black),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: RotatedBox(
+                                      quarterTurns: 3,
+                                      child: Container(
+                                        height: 30,
+                                        child: Slider(
+                                          value: _currentExposureOffset,
+                                          min: _minAvailableExposureOffset,
+                                          max: _maxAvailableExposureOffset,
+                                          activeColor: Colors.white,
+                                          inactiveColor: Colors.white30,
+                                          onChanged: (value) async {
+                                            setState(() {
+                                              _currentExposureOffset = value;
+                                            });
+                                            await controller!
+                                                .setExposureOffset(value);
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Slider(
+                                          value: _currentZoomLevel,
+                                          min: _minAvailableZoom,
+                                          max: _maxAvailableZoom,
+                                          activeColor: Colors.white,
+                                          inactiveColor: Colors.white30,
+                                          onChanged: (value) async {
+                                            setState(() {
+                                              _currentZoomLevel = value;
+                                            });
+                                            await controller!
+                                                .setZoomLevel(value);
+                                          },
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 8.0),
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black87,
+                                            borderRadius:
+                                                BorderRadius.circular(10.0),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Text(
+                                              _currentZoomLevel
+                                                      .toStringAsFixed(1) +
+                                                  'x',
+                                              style: TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isCameraInitialized = false;
+                                });
+                                onNewCameraSelected(
+                                    cameras[_isRearCameraSelected ? 1 : 0]);
+                                setState(() {
+                                  _isRearCameraSelected =
+                                      !_isRearCameraSelected;
+                                });
+                              },
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.circle,
+                                    color: Color(0xffB4C5D5),
+                                    size: 60,
+                                  ),
+                                  Icon(
+                                    _isRearCameraSelected
+                                        ? Icons.camera_front
+                                        : Icons.camera_rear,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () async {
+                                XFile? rawImage = await takePicture();
+                                File imageFile = File(rawImage!.path);
+
+                                int currentUnix =
+                                    DateTime.now().millisecondsSinceEpoch;
+
+                                final directory =
+                                    await getApplicationDocumentsDirectory();
+
+                                String fileFormat =
+                                    imageFile.path.split('.').last;
+
+                                print(fileFormat);
+
+                                if (_isRearCameraSelected == true) {
+                                  _saveImage(rawImage.path);
+                                  await imageFile.copy(
+                                    '${directory.path}/$currentUnix.$fileFormat',
+                                  );
+                                  //이미지 정상으로.
+                                  await compute(rotateImage, rawImage.path)
+                                      .then((value) {
+                                    _imagepath = value;
+                                  }).catchError((onError) {
+                                    print("rotate error");
+                                  });
+                                } else {
+                                  await compute(rotateImage, rawImage.path)
+                                      .then((value) {
+                                    _imagepath = value;
+                                  }).catchError((onError) {
+                                    print("rotate error");
+                                  });
+                                  _saveImage(rawImage.path);
+                                  await imageFile.copy(
+                                    '${directory.path}/$currentUnix.$fileFormat',
+                                  );
+                                  //이미지 정상으로.
+                                }
+
+                                await processImage(_imagepath);
+
+                                refreshAlreadyCapturedImages();
+                              },
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.circle,
+                                    color: Color(0xffB4C5D5),
+                                    size: 80,
+                                  ),
+                                  Icon(
+                                    Icons.circle,
+                                    color: Colors.white,
+                                    size: 65,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: _imageFile != null
+                                  ? () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => PreviewScreen(
+                                            imageFile: _imageFile!,
+                                            fileList: allFileList,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  : null,
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  color: Colors.black,
+                                  borderRadius: BorderRadius.circular(10.0),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  image: _imageFile != null
+                                      ? DecorationImage(
+                                          image: FileImage(_imageFile!),
+                                          fit: BoxFit.cover,
+                                        )
+                                      : null,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ],
+                      )
+                    ],
+                  )
+                : Center(
+                    child: Text(
+                      'LOADING',
+                      style: TextStyle(color: Colors.black),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Row(
-
-                mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+                  )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isCameraInitialized = false;
-                      });
-                      onNewCameraSelected(cameras[
-                      _isRearCameraSelected
-                          ? 1
-                          : 0]);
-                      setState(() {
-                        _isRearCameraSelected =
-                        !_isRearCameraSelected;
-                      });
-                    },
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        const Icon(
-                          Icons.circle,
-                          color: Color(0xffB4C5D5),
-                          size: 60,
-                        ),
-                        Icon(
-                          _isRearCameraSelected
-                              ? Icons.camera_front
-                              : Icons.camera_rear,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      ],
+                  Row(),
+                  const Text(
+                    'Permission denied',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 24,
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () async {
-                      XFile? rawImage =
-                      await takePicture();
-                      File imageFile =
-                      File(rawImage!.path);
-
-                      int currentUnix = DateTime.now()
-                          .millisecondsSinceEpoch;
-
-                      final directory =
-                      await getApplicationDocumentsDirectory();
-
-                      String fileFormat = imageFile
-                          .path
-                          .split('.')
-                          .last;
-
-                      print(fileFormat);
-
-                      if (_isRearCameraSelected == true) {
-                        _saveImage(rawImage.path);
-                        await imageFile.copy(
-                          '${directory.path}/$currentUnix.$fileFormat',
-                        );
-                        //이미지 정상으로.
-                        await compute(rotateImage,rawImage.path).then((value) {
-                          _imagepath = value;
-                        }).catchError((onError) {
-                          print("rotate error");
-                        });
-                      } else {
-                        await compute(rotateImage,rawImage.path).then((value) {
-                          _imagepath = value;
-                        }).catchError((onError) {
-                          print("rotate error");
-                        });
-                        _saveImage(rawImage.path);
-                        await imageFile.copy(
-                          '${directory.path}/$currentUnix.$fileFormat',
-                        );
-                        //이미지 정상으로.
-                      }
-
-                      await processImage(_imagepath);
-
-
-                      refreshAlreadyCapturedImages();
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () {
+                      getPermissionStatus();
                     },
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          color: Color(0xffB4C5D5),
-                          size: 80,
+                    child: const Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: Text(
+                        'Give permission',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 24,
                         ),
-                        Icon(
-                          Icons.circle,
-                          color: Colors.white,
-                          size: 65,
-                        ),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _imageFile != null
-                        ? () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              PreviewScreen(
-                                imageFile: _imageFile!,
-                                fileList: allFileList,
-                              ),
-                        ),
-                      );
-                    }
-                        : null,
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius:
-                        BorderRadius.circular(10.0),
-                        border: Border.all(
-                          color: Colors.white,
-                          width: 2,
-                        ),
-                        image: _imageFile != null
-                            ? DecorationImage(
-                          image:
-                          FileImage(_imageFile!),
-                          fit: BoxFit.cover,
-                        )
-                            : null,
                       ),
                     ),
                   ),
                 ],
               ),
-            )
-          ],
-
-        )
-            : Center(
-          child: Text(
-            'LOADING',
-            style: TextStyle(color: Colors.black),
-          ),
-        )
-            : Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(),
-            const Text(
-              'Permission denied',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 24,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                getPermissionStatus();
-              },
-              child: const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Text(
-                  'Give permission',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 24,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
 
-
   Widget overlay(BuildContext context) {
-    return Positioned(
-        height: MediaQuery
-            .of(context)
-            .size
-            .height * 0.5,
-        width: MediaQuery
-            .of(context)
-            .size
-            .width,
-        bottom: 0,
-        child: Material(
-            borderRadius: const BorderRadius.only(topRight: Radius.circular(10),topLeft: Radius.circular(10)),
-            color: Colors.white,
-            child: Stack(
-              children: [
-                Positioned(
-                  top: 0,
-                  height: MediaQuery.of(context).size.width*0.15,
-                  width: double.infinity,
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    child: Text(
-                      _dataManager.getText(),
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black
+    return Stack(
+      children: [
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            height: MediaQuery.of(context).size.height,
+            width: MediaQuery.of(context).size.width,
+          ),
+        ),
+        Positioned(
+          height: MediaQuery.of(context).size.height * 0.5,
+          width: MediaQuery.of(context).size.width,
+          bottom: 0,
+          child: Material(
+              shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(10),
+                      topLeft: Radius.circular(10))),
+              color: Colors.white,
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: MediaQuery.of(context).size.width * 0.15,
+                    width: MediaQuery.of(context).size.width,
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        _dataManager.getText(),
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black),
                       ),
                     ),
                   ),
-
-                ),
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: () {
-                      _launchUrl(_dataManager.getAdUrl());
-                    },
-                    child: Image.network(
-                      _dataManager.getImageUrl(),
-                      fit: BoxFit.fill,
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        _launchUrl(_dataManager.getAdUrl());
+                      },
+                      child: Image.network(
+                        _dataManager.getImageUrl(),
+                        fit: BoxFit.fill,
+                      ),
                     ),
                   ),
-                ),
-                Positioned(
-                    height: MediaQuery.of(context).size.width*0.25,
-                    bottom: 0,
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: () {
-                            _launchUrl(_dataManager.getAdUrl());
-                          },
-                          child: Container(
-                              height: MediaQuery.of(context).size.width*0.15,
-                              width: MediaQuery.of(context).size.width*0.45,
-                              padding: const EdgeInsets.all(10.0),
-                              margin: const EdgeInsets.all(10.0),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                color: Color(0xffB4C5D5),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  "광고로 이동!",
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color:Colors.white,
-                                  ),
+                  SizedBox(
+                      height: MediaQuery.of(context).size.width * 0.25,
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              _launchUrl(_dataManager.getAdUrl());
+                            },
+                            child: Container(
+                                height:
+                                    MediaQuery.of(context).size.width * 0.15,
+                                width: MediaQuery.of(context).size.width * 0.45,
+                                padding: const EdgeInsets.all(10.0),
+                                margin: const EdgeInsets.all(10.0),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  color: Color(0xffB4C5D5),
                                 ),
-                              )
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            // When the icon is pressed the OverlayEntry
-                            // is removed from Overlay
-                            removeOverlay();
-                          },
-                          child: Container(
-                              height: MediaQuery.of(context).size.width*0.15,
-                              width: MediaQuery.of(context).size.width*0.45,
-                              padding: const EdgeInsets.all(2.0),
-                              margin: const EdgeInsets.all(2.0),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10),
-                                color: const Color(0xffB4C5D5),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  "안볼래요",
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color:Colors.white,
+                                child: const Center(
+                                  child: Text(
+                                    "광고로 이동!",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ),
-                              )
+                                )),
                           ),
-                        ),
-                      ],
-                    )
-                ),
-              ],
-            )),
-        );
+                          GestureDetector(
+                            onTap: () {
+                              // When the icon is pressed the OverlayEntry
+                              // is removed from Overlay
+                              removeOverlay();
+                            },
+                            child: Container(
+                                height:
+                                    MediaQuery.of(context).size.width * 0.15,
+                                width: MediaQuery.of(context).size.width * 0.45,
+                                padding: const EdgeInsets.all(2.0),
+                                margin: const EdgeInsets.all(2.0),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  color: const Color(0xffB4C5D5),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    "안볼래요",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                )),
+                          ),
+                        ],
+                      )),
+                ],
+              )),
+        )
+      ],
+    );
   }
 
   late final OverlayEntry overlayEntry =
-  OverlayEntry(builder: (context) => overlay(context));
+      OverlayEntry(builder: (context) => overlay(context));
 
   void insertOverlay() {
     ///오버레이 삽입
@@ -720,7 +709,6 @@ class _CameraScreenState extends State<CameraScreen>
       throw 'Could not launch $_url';
     }
   }
-
 
   void _saveImage(String path) async {
     ///이미지 갤러리 저장
