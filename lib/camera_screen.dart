@@ -590,9 +590,8 @@ class _CameraScreenState extends State<CameraScreen>
               color: Colors.white,
               child: Column(
                 children: [
-                  Container(
+                  SizedBox(
                     width: MediaQuery.of(context).size.width,
-                    child: Flexible(
                       child: Container(
                         padding: const EdgeInsets.all(20),
                       child: Text(
@@ -602,8 +601,7 @@ class _CameraScreenState extends State<CameraScreen>
                             fontWeight: FontWeight.bold,
                             color: Colors.black),
                       ),
-                    ),)
-
+                    ),
                   ),
                   Expanded(
                     child: GestureDetector(
