@@ -18,6 +18,7 @@ import 'package:flutter_native_image/flutter_native_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
+import 'captures_screen.dart';
 import 'model/DataManager.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -27,7 +28,7 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen>
     with WidgetsBindingObserver {
-  DataManager _dataManager = new DataManager();
+  final DataManager _dataManager = DataManager();
 
   CameraController? controller;
 
@@ -497,9 +498,8 @@ class _CameraScreenState extends State<CameraScreen>
                                   ? () {
                                       Navigator.of(context).push(
                                         MaterialPageRoute(
-                                          builder: (context) => PreviewScreen(
-                                            imageFile: _imageFile!,
-                                            fileList: allFileList,
+                                          builder: (context) => CapturesScreen(
+                                            imageFileList: allFileList,
                                           ),
                                         ),
                                       );
@@ -579,7 +579,6 @@ class _CameraScreenState extends State<CameraScreen>
           ),
         ),
         Positioned(
-          height: MediaQuery.of(context).size.height * 0.6,
           width: MediaQuery.of(context).size.width,
           bottom: 0,
           child: Material(
@@ -592,8 +591,8 @@ class _CameraScreenState extends State<CameraScreen>
                 children: [
                   SizedBox(
                     width: MediaQuery.of(context).size.width,
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
                       child: Text(
                         _dataManager.getText(),
                         style: const TextStyle(
@@ -768,7 +767,6 @@ class _CameraScreenState extends State<CameraScreen>
           faces[0].boundingBox.height.toInt());
     }
     compressFile(cimage).then((value) => cimage = value);
-    _saveImage(cimage.path);
 
     await _dataManager.fetchModel(cimage.path).then((value) {
       insertOverlay();

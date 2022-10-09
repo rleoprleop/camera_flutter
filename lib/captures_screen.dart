@@ -16,16 +16,20 @@ class CapturesScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'Captures',
-                style: TextStyle(
-                  fontSize: 32.0,
-                  color: Colors.white,
+              padding: const EdgeInsets.all(8.0),
+              child: TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('돌아가기'),
+                style: TextButton.styleFrom(
+                  primary: Colors.black,
+                  backgroundColor: Colors.white,
                 ),
               ),
             ),
             GridView.count(
+              reverse: true,
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
               crossAxisCount: 2,
