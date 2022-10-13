@@ -48,7 +48,8 @@ dependencies:
   extended_image:
   flutter_native_image:
   flutter_launcher_icons:
-  permission_handler: 
+  permission_handler:
+  sqflite:
 
 dev_dependencies:
   flutter_test:
