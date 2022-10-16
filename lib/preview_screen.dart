@@ -1,12 +1,13 @@
 import 'dart:io';
 
+import 'package:example/db/ImgInfo.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'captures_screen.dart';
 
 class PreviewScreen extends StatelessWidget {
-  final File imageFile;
-  final List<File> fileList;
+  final ImgInfo imageFile;
+  final List<ImgInfo> fileList;
 
   PreviewScreen({
     required this.imageFile,
@@ -21,7 +22,7 @@ class PreviewScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Image.file(imageFile),
+            child: Image.file(File(imageFile.image)),
           ),
           SizedBox(
             width: MediaQuery.of(context).size.width,

@@ -1,8 +1,6 @@
-import 'dart:html';
-
 final String TableName = 'ImageInfo';
 
-class ImageFields {
+class ImgFields {
   static final List<String> values=[
     id, info, age, image, gender, name, banner, ad
   ];
@@ -17,7 +15,7 @@ class ImageFields {
   static final String ad = '_ad';
 }
 
-class ImageInfo {
+class ImgInfo {
   final int? id;
   final bool info;
   final int age;
@@ -27,7 +25,7 @@ class ImageInfo {
   final String banner;
   final String ad;
 
-  const ImageInfo(
+  const ImgInfo(
       {this.id,
       required this.info,
       required this.age,
@@ -40,30 +38,30 @@ class ImageInfo {
 
   Map<String, dynamic> toMap() {
     return {
-      ImageFields.id: id,
-      ImageFields.info: info ? 1 : 0,
-      ImageFields.age: age,
-      ImageFields.image: image,
-      ImageFields.gender: gender,
-      ImageFields.name: name,
-      ImageFields.banner: banner,
-      ImageFields.ad: ad
+      ImgFields.id: id,
+      ImgFields.info: info ? 1 : 0,
+      ImgFields.age: age,
+      ImgFields.image: image,
+      ImgFields.gender: gender,
+      ImgFields.name: name,
+      ImgFields.banner: banner,
+      ImgFields.ad: ad
     };
   }
 
-  static ImageInfo fromJson(Map<String, Object?> json)=> ImageInfo(
-    id:json[ImageFields.id] as int?,
-    info:json[ImageFields.info] == 1,
-    age:json[ImageFields.age] as int,
-    image:json[ImageFields.image] as String,
-    gender:json[ImageFields.gender] as String,
-    name:json[ImageFields.name] as String,
-    banner:json[ImageFields.banner] as String,
-    ad:json[ImageFields.ad] as String,
+  static ImgInfo fromJson(Map<String, Object?> json)=> ImgInfo(
+    id:json[ImgFields.id] as int?,
+    info:json[ImgFields.info] == 1,
+    age:json[ImgFields.age] as int,
+    image:json[ImgFields.image] as String,
+    gender:json[ImgFields.gender] as String,
+    name:json[ImgFields.name] as String,
+    banner:json[ImgFields.banner] as String,
+    ad:json[ImgFields.ad] as String,
   );
 
 
-  ImageInfo copy({
+  ImgInfo copy({
     int? id,
     bool? info,
     int? age,
@@ -73,7 +71,7 @@ class ImageInfo {
     String? banner,
     String? ad,
   }) =>
-      ImageInfo(
+      ImgInfo(
           id: id ?? this.id,
           info: info ?? this.info,
           age: age ?? this.age,

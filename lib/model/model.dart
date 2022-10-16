@@ -1,4 +1,5 @@
 class Model {
+  final int id;
   final int age;
   final String gender;
   final String name;
@@ -6,6 +7,7 @@ class Model {
   final String ad_url;
 
   const Model({
+    required this.id,
     required this.age,
     required this.gender,
     required this.name,
@@ -15,6 +17,7 @@ class Model {
 
   factory Model.fromJson(Map<String, dynamic> json) {
     return Model(
+      id: json['id'],
       age: json['age'],
       gender: json['gender'],
       name: json['name'],

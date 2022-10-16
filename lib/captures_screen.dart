@@ -1,11 +1,13 @@
 import 'dart:io';
+import 'package:example/db/ImgInfo.dart';
 import 'package:flutter/material.dart';
 import 'package:example/preview_screen.dart';
 
 class CapturesScreen extends StatelessWidget {
-  final List<File> imageFileList;
+  final List<ImgInfo>? imageFileList;
 
   const CapturesScreen({required this.imageFileList});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -28,13 +30,13 @@ class CapturesScreen extends StatelessWidget {
                 ),
               ),
             ),
+            imageFileList != null ?
             GridView.count(
-              reverse: true,
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
               crossAxisCount: 2,
               children: [
-                for (File imageFile in imageFileList)
+                for (ImgInfo imageFile in imageFileList!)
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(
@@ -46,20 +48,27 @@ class CapturesScreen extends StatelessWidget {
                       onTap: () {
                         Navigator.of(context).pushReplacement(
                           MaterialPageRoute(
-                            builder: (context) => PreviewScreen(
-                              fileList: imageFileList,
-                              imageFile: imageFile,
-                            ),
+                            builder: (context) =>
+                                PreviewScreen(
+                                  fileList: imageFileList!,
+                                  imageFile: imageFile,
+                                ),
                           ),
                         );
                       },
                       child: Image.file(
-                        imageFile,
+                        File(imageFile.image),
                         fit: BoxFit.cover,
                       ),
                     ),
                   ),
               ],
+            )
+            : const Center(
+              child: Text(
+                'Empty',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),

@@ -4,7 +4,8 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:camera/camera.dart';
-import 'package:example/preview_screen.dart';
+import 'package:example/db/DBProvider.dart';
+import 'package:example/db/ImgInfo.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -32,7 +33,19 @@ class _CameraScreenState extends State<CameraScreen>
 
   CameraController? controller;
 
-  File? _imageFile;
+  File? _imageFile; // preview image
+
+  late ImgInfo imgInfo;
+  List<ImgInfo>? allImgList;
+  bool isLoading = false;
+
+  late bool info;
+  late int age;
+  late String image;
+  late String gender;
+  late String name;
+  late String banner;
+  late String ad;
 
   // Initial values
   bool _isCameraInitialized = false;
@@ -60,8 +73,6 @@ class _CameraScreenState extends State<CameraScreen>
   double _currentZoomLevel = 1.0;
   double _currentExposureOffset = 0.0;
 
-  List<File> allFileList = [];
-
   final resolutionPresets = ResolutionPreset.values;
 
   ResolutionPreset currentResolutionPreset = ResolutionPreset.high;
@@ -77,35 +88,32 @@ class _CameraScreenState extends State<CameraScreen>
       });
       // Set and initialize the new camera
       onNewCameraSelected(cameras[0]);
-      refreshAlreadyCapturedImages();
     } else {
       log('Camera Permission: DENIED');
     }
   }
 
+  Future refreshImage() async {
+    setState(() => isLoading = true);
+    if (allImgList != null) {
+      allImgList!.clear();
+    }
+    var ImgList = await DBProvider.instance.readAllImage();
+
+    print('addddddd ${ImgList}');
+    if (ImgList.isNotEmpty) {
+      allImgList = List.from(ImgList.reversed);
+      print('all image list $allImgList');
+    }
+    refreshAlreadyCapturedImages();
+    print('aaaaaaaaaaa${allImgList}');
+
+    setState(() => isLoading = false);
+  }
+
   refreshAlreadyCapturedImages() async {
-    final directory = await getApplicationDocumentsDirectory();
-    List<FileSystemEntity> fileList = await directory.list().toList();
-    allFileList.clear();
-    List<Map<int, dynamic>> fileNames = [];
-
-    fileList.forEach((file) {
-      if (file.path.contains('.jpg')) {
-        allFileList.add(File(file.path));
-
-        String name = file.path.split('/').last.split('.').first;
-        fileNames.add({0: int.parse(name), 1: file.path.split('/').last});
-      }
-    });
-
-    if (fileNames.isNotEmpty) {
-      final recentFile =
-          fileNames.reduce((curr, next) => curr[0] > next[0] ? curr : next);
-      String recentFileName = recentFile[1];
-
-      _imageFile = File('${directory.path}/$recentFileName');
-
-      setState(() {});
+    if (allImgList!.isNotEmpty) {
+      _imageFile = File(allImgList![0].image);
     }
   }
 
@@ -199,6 +207,7 @@ class _CameraScreenState extends State<CameraScreen>
   void initState() {
     // Hide the status bar in Android
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+    refreshImage();
     getPermissionStatus();
     super.initState();
   }
@@ -224,6 +233,8 @@ class _CameraScreenState extends State<CameraScreen>
     controller?.dispose();
     overlayEntry.dispose();
     _faceDetector.close();
+    DBProvider.instance.close();
+
     super.dispose();
   }
 
@@ -441,41 +452,39 @@ class _CameraScreenState extends State<CameraScreen>
 
                                 final directory =
                                     await getApplicationDocumentsDirectory();
+                                print(
+                                    'image Directory $directory, rawImage ${rawImage.path}');
 
                                 String fileFormat =
                                     imageFile.path.split('.').last;
 
                                 print(fileFormat);
 
+                                String file =
+                                    '${directory.path}/$currentUnix.$fileFormat';
                                 if (_isRearCameraSelected == true) {
                                   _saveImage(rawImage.path);
-                                  await imageFile.copy(
-                                    '${directory.path}/$currentUnix.$fileFormat',
-                                  );
-                                  //이미지 정상으로.
+                                  await imageFile.copy(file);
                                   await compute(rotateImage, rawImage.path)
-                                      .then((value) {
-                                    _imagepath = value;
+                                      .then((value) async {
+                                    _imagepath = value.path;
+                                    addImg(value.path);
                                   }).catchError((onError) {
                                     print("rotate error");
                                   });
                                 } else {
                                   await compute(rotateImage, rawImage.path)
-                                      .then((value) {
-                                    _imagepath = value;
+                                      .then((value) async {
+                                    _imagepath = value.path;
+                                    addImg(value.path);
                                   }).catchError((onError) {
                                     print("rotate error");
                                   });
                                   _saveImage(rawImage.path);
-                                  await imageFile.copy(
-                                    '${directory.path}/$currentUnix.$fileFormat',
-                                  );
-                                  //이미지 정상으로.
+                                  await imageFile.copy(file);
                                 }
-
+                                refreshImage();
                                 await processImage(_imagepath);
-
-                                refreshAlreadyCapturedImages();
                               },
                               child: Stack(
                                 alignment: Alignment.center,
@@ -494,17 +503,15 @@ class _CameraScreenState extends State<CameraScreen>
                               ),
                             ),
                             GestureDetector(
-                              onTap: _imageFile != null
-                                  ? () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (context) => CapturesScreen(
-                                            imageFileList: allFileList,
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  : null,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => CapturesScreen(
+                                      imageFileList: allImgList,
+                                    ),
+                                  ),
+                                );
+                              },
                               child: Container(
                                 width: 60,
                                 height: 60,
@@ -566,6 +573,19 @@ class _CameraScreenState extends State<CameraScreen>
               ),
       ),
     );
+  }
+
+  Future addImg(String path) async {
+    final img = ImgInfo(
+        info: false,
+        age: 0,
+        image: path,
+        gender: '',
+        name: '',
+        banner: '',
+        ad: '');
+
+    await DBProvider.instance.create(img);
   }
 
   Widget overlay(BuildContext context) {
@@ -793,7 +813,7 @@ class _CameraScreenState extends State<CameraScreen>
   }
 }
 
-Future<String> rotateImage(String path) async {
+Future<File> rotateImage(String path) async {
   ///사진 좌우반전
   final originalFile = File(path);
   List<int> imageBytes = await originalFile.readAsBytes();
@@ -802,5 +822,5 @@ Future<String> rotateImage(String path) async {
   fixedImage = img.flipHorizontal(originalImage!);
 
   final fixedFile = await originalFile.writeAsBytes(img.encodeJpg(fixedImage));
-  return fixedFile.path;
+  return fixedFile;
 }
